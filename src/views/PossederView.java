@@ -1,104 +1,112 @@
-package views;
+package controllers;
 
-import controllers.PossederController;
+import database.DatabaseConnection;
 import models.Posseder;
 
 import javax.swing.*;
-import java.awt.*;
-import java.util.Date;
+import java.sql.*;
+import java.util.ArrayList;
 import java.util.List;
 
-public class PossederView extends JFrame {
-    private PossederController controller;
+public class PossederController {
 
-    public PossederView() {
-        controller = new PossederController();
+    // Récupérer toutes les relations Posseder
+    public List<Posseder> getAllPosseder() {
+        List<Posseder> posseders = new ArrayList<>();
+        try (Connection conn = DatabaseConnection.getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery("SELECT * FROM POSSEDER")) {
 
-        setTitle("Gestion des Propriétés");
-        setSize(800, 500);
-        setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-        setLocationRelativeTo(null);
-
-        // Panel principal
-        JPanel panel = new JPanel();
-        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
-
-        // Charger les relations Posseder
-        List<Posseder> posseders = controller.getAllPosseder();
-        for (Posseder posseder : posseders) {
-            JPanel possederPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-            JLabel possederLabel = new JLabel(
-                    "Propriétaire ID: " + posseder.getIdProprietaire() +
-                            ", Véhicule ID: " + posseder.getIdVehicule() +
-                            ", Début: " + posseder.getDateDebutPropriete() +
-                            ", Fin: " + (posseder.getDateFinPropriete() != null ? posseder.getDateFinPropriete() : "En cours")
-            );
-
-            JButton deleteButton = new JButton("Supprimer");
-            deleteButton.addActionListener(e -> {
-                controller.deletePosseder(posseder.getIdProprietaire(), posseder.getIdVehicule());
-                refreshView();
-            });
-
-            possederPanel.add(possederLabel);
-            possederPanel.add(deleteButton);
-            panel.add(possederPanel);
+            while (rs.next()) {
+                posseders.add(new Posseder(
+                        rs.getInt("id_proprietaire"),
+                        rs.getInt("id_vehicule"),
+                        rs.getDate("date_debut_propriete"),
+                        rs.getDate("date_fin_propriete")
+                ));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
         }
+        return posseders;
+    }
 
-        // Panel pour les boutons "Ajouter" et "Retour"
-        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
+    // Ajouter une relation Posseder
+    public void addPosseder(int idProprietaire, int idVehicule, java.util.Date dateDebutPropriete, java.util.Date dateFinPropriete) {
+        try (Connection conn = DatabaseConnection.getConnection()) {
+            // Vérifier si la relation existe déjà
+            if (existsPosseder(conn, idProprietaire, idVehicule)) {
+                showAlert("Erreur", "Cette relation existe déjà.");
+                return;
+            }
+    
+            // Convertir java.util.Date en java.sql.Date
+            java.sql.Date sqlDateDebut = new java.sql.Date(dateDebutPropriete.getTime());
+            java.sql.Date sqlDateFin = dateFinPropriete != null ? new java.sql.Date(dateFinPropriete.getTime()) : null;
+    
+            // Insérer la nouvelle relation
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "INSERT INTO POSSEDER (id_proprietaire, id_vehicule, date_debut_propriete, date_fin_propriete) VALUES (?, ?, ?, ?)")) {
+                ps.setInt(1, idProprietaire);
+                ps.setInt(2, idVehicule);
+                ps.setDate(3, sqlDateDebut);
+                ps.setDate(4, sqlDateFin);
+                ps.executeUpdate();
+                showAlert("Succès", "La relation a été ajoutée avec succès !");
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            showAlert("Erreur", "Une erreur s'est produite lors de l'ajout de la relation.");
+        }
+    }
 
-        // Bouton "Ajouter une relation"
-        JButton addButton = new JButton("Ajouter une relation");
-        addButton.addActionListener(e -> {
-            JTextField proprietaireField = new JTextField();
-            JTextField vehiculeField = new JTextField();
-            JTextField dateDebutField = new JTextField();
-            JTextField dateFinField = new JTextField();
+    // Supprimer une relation Posseder
+    public void deletePosseder(int idProprietaire, int idVehicule) {
+        try (Connection conn = DatabaseConnection.getConnection()) {
+            // Demander confirmation à l'utilisateur
+            int confirmation = showConfirmation("Confirmation de suppression",
+                    "Êtes-vous sûr de vouloir supprimer cette relation ?");
 
-            Object[] message = {
-                    "ID Propriétaire:", proprietaireField,
-                    "ID Véhicule:", vehiculeField,
-                    "Date de début (AAAA-MM-JJ):", dateDebutField,
-                    "Date de fin (AAAA-MM-JJ, optionnel):", dateFinField
-            };
+            if (confirmation == JOptionPane.YES_OPTION) {
+                try (PreparedStatement ps = conn.prepareStatement(
+                        "DELETE FROM POSSEDER WHERE id_proprietaire = ? AND id_vehicule = ?")) {
+                    ps.setInt(1, idProprietaire);
+                    ps.setInt(2, idVehicule);
+                    ps.executeUpdate();
+                    showAlert("Succès", "La relation a été supprimée avec succès !");
+                }
+            } else {
+                showAlert("Annulé", "La suppression a été annulée.");
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            showAlert("Erreur", "Une erreur s'est produite lors de la suppression de la relation.");
+        }
+    }
 
-            int option = JOptionPane.showConfirmDialog(this, message, "Ajouter une relation", JOptionPane.OK_CANCEL_OPTION);
-            if (option == JOptionPane.OK_OPTION) {
-                try {
-                    int idProprietaire = Integer.parseInt(proprietaireField.getText());
-                    int idVehicule = Integer.parseInt(vehiculeField.getText());
-                    Date dateDebut = java.sql.Date.valueOf(dateDebutField.getText());
-                    Date dateFin = dateFinField.getText().isEmpty() ? null : java.sql.Date.valueOf(dateFinField.getText());
+    // Vérifier si une relation existe déjà
+    private boolean existsPosseder(Connection conn, int idProprietaire, int idVehicule) throws SQLException {
+        String query = "SELECT COUNT(*) FROM POSSEDER WHERE id_proprietaire = ? AND id_vehicule = ?";
+        try (PreparedStatement ps = conn.prepareStatement(query)) {
+            ps.setInt(1, idProprietaire);
+            ps.setInt(2, idVehicule);
 
-                    refreshView();
-                } catch (Exception ex) {
-                    JOptionPane.showMessageDialog(this, "Erreur de saisie : " + ex.getMessage(), "Erreur", JOptionPane.ERROR_MESSAGE);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1) > 0;
                 }
             }
-        });
-
-        // Bouton "Retour"
-        JButton backButton = new JButton("Retour");
-        backButton.addActionListener(e -> dispose());
-
-        // Ajouter les boutons au panel
-        buttonPanel.add(addButton);
-        buttonPanel.add(backButton);
-
-        // Ajouter le panel des boutons au panneau principal
-        panel.add(buttonPanel);
-
-        // Ajouter un JScrollPane pour la barre de défilement
-        JScrollPane scrollPane = new JScrollPane(panel);
-        add(scrollPane);
-
-        setVisible(true);
+        }
+        return false;
     }
 
-    // Rafraîchir la vue
-    private void refreshView() {
-        dispose();
-        new PossederView();
+    // Afficher une alerte
+    private void showAlert(String title, String message) {
+        JOptionPane.showMessageDialog(null, message, title, JOptionPane.INFORMATION_MESSAGE);
     }
-}   
+
+    // Afficher une boîte de confirmation
+    private int showConfirmation(String title, String message) {
+        return JOptionPane.showConfirmDialog(null, message, title, JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+    }
+}
