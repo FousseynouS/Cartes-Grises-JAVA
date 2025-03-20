@@ -31,6 +31,48 @@ public class PossederController {
         return posseders;
     }
 
+
+
+    // Dans PossederController.java
+
+// Méthode pour récupérer le nom d'un propriétaire par son ID
+public String getProprietaireNameById(int idProprietaire) {
+    String query = "SELECT nom, prenom FROM PROPRIETAIRE WHERE id_proprietaire = ?";
+    try (Connection conn = DatabaseConnection.getConnection();
+         PreparedStatement ps = conn.prepareStatement(query)) {
+        ps.setInt(1, idProprietaire);
+        try (ResultSet rs = ps.executeQuery()) {
+            if (rs.next()) {
+                return rs.getString("nom") + " " + rs.getString("prenom");
+            }
+        }
+    } catch (SQLException e) {
+        e.printStackTrace();
+    }
+    return "Propriétaire inconnu";
+}
+
+// Méthode pour récupérer le nom d'un véhicule par son ID
+public String getVehiculeNameById(int idVehicule) {
+    String query = "SELECT matricule FROM VEHICULE WHERE id_vehicule = ?";
+    try (Connection conn = DatabaseConnection.getConnection();
+         PreparedStatement ps = conn.prepareStatement(query)) {
+        ps.setInt(1, idVehicule);
+        try (ResultSet rs = ps.executeQuery()) {
+            if (rs.next()) {
+                return rs.getString("matricule");
+            }
+        }
+    } catch (SQLException e) {
+        e.printStackTrace();
+    }
+    return "Véhicule inconnu";
+}
+
+
+
+
+
     // Ajouter une relation Posseder
     public void addPosseder(int idProprietaire, int idVehicule, Date dateDebutPropriete, Date dateFinPropriete) {
         try (Connection conn = DatabaseConnection.getConnection()) {
@@ -77,6 +119,35 @@ public class PossederController {
         } catch (SQLException e) {
             e.printStackTrace();
             showAlert("Erreur", "Une erreur s'est produite lors de la suppression de la relation.");
+        }
+    }
+
+    
+     public void updatePosseder(int idProprietaire, int idVehicule, Date newDateDebut, Date newDateFin) {
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(
+                 "UPDATE POSSEDER SET date_debut_propriete = ?, date_fin_propriete = ? " +
+                 "WHERE id_proprietaire = ? AND id_vehicule = ?")) {
+    
+            // Définir les paramètres de la requête
+            ps.setDate(1, newDateDebut);
+            ps.setDate(2, newDateFin);
+            ps.setInt(3, idProprietaire);
+            ps.setInt(4, idVehicule);
+    
+            // Exécuter la mise à jour
+            int rowsAffected = ps.executeUpdate();
+    
+            // Vérifier si la mise à jour a réussi
+            if (rowsAffected == 0) {
+                JOptionPane.showMessageDialog(null, "Erreur : La relation n'a pas été trouvée.", "Erreur", JOptionPane.ERROR_MESSAGE);
+            } else {
+                JOptionPane.showMessageDialog(null, "La relation a été mise à jour avec succès.", "Succès", JOptionPane.INFORMATION_MESSAGE);
+            }
+    
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(null, "Erreur lors de la mise à jour de la relation : " + e.getMessage(), "Erreur", JOptionPane.ERROR_MESSAGE);
         }
     }
 
