@@ -2,10 +2,16 @@ package views;
 
 import controllers.PossederController;
 import models.Posseder;
+import database.DatabaseConnection;
 
 import javax.swing.*;
 import java.awt.*;
+import java.sql.Connection;
 import java.sql.Date;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.List;
 
 public class PossederView extends JFrame {
@@ -99,14 +105,19 @@ public class PossederView extends JFrame {
         // Bouton pour ajouter une nouvelle relation
         JButton addButton = new JButton("Ajouter une relation");
         addButton.addActionListener(e -> {
-            JTextField idProprietaireField = new JTextField();
-            JTextField idVehiculeField = new JTextField();
+            // Récupérer les listes de propriétaires et de modèles de véhicules
+            List<String> proprietaires = getProprietaires();
+            List<String> modelesVehicules = getModelesVehicules();
+
+            // Créer les JComboBox
+            JComboBox<String> proprietaireComboBox = new JComboBox<>(proprietaires.toArray(new String[0]));
+            JComboBox<String> modeleComboBox = new JComboBox<>(modelesVehicules.toArray(new String[0]));
             JTextField dateDebutField = new JTextField();
             JTextField dateFinField = new JTextField();
 
             Object[] message = {
-                    "ID Propriétaire:", idProprietaireField,
-                    "ID Véhicule:", idVehiculeField,
+                    "Propriétaire:", proprietaireComboBox,
+                    "Modèle de véhicule:", modeleComboBox,
                     "Date de début (YYYY-MM-DD):", dateDebutField,
                     "Date de fin (YYYY-MM-DD, facultatif):", dateFinField
             };
@@ -114,8 +125,13 @@ public class PossederView extends JFrame {
             int option = JOptionPane.showConfirmDialog(this, message, "Ajouter une relation", JOptionPane.OK_CANCEL_OPTION);
             if (option == JOptionPane.OK_OPTION) {
                 try {
-                    int idProprietaire = Integer.parseInt(idProprietaireField.getText());
-                    int idVehicule = Integer.parseInt(idVehiculeField.getText());
+                    // Extraire les ID des chaînes sélectionnées
+                    String selectedProprietaire = (String) proprietaireComboBox.getSelectedItem();
+                    String selectedModele = (String) modeleComboBox.getSelectedItem();
+                    int idProprietaire = Integer.parseInt(selectedProprietaire.split(" - ")[0]);
+                    int idVehicule = Integer.parseInt(selectedModele.split(" - ")[0]);
+
+                    // Convertir les dates
                     Date dateDebut = Date.valueOf(dateDebutField.getText());
                     Date dateFin = dateFinField.getText().isEmpty() ? null : Date.valueOf(dateFinField.getText());
 
@@ -125,6 +141,7 @@ public class PossederView extends JFrame {
                         return;
                     }
 
+                    // Ajouter la relation
                     controller.addPosseder(idProprietaire, idVehicule, dateDebut, dateFin);
                     refreshView();
                 } catch (Exception ex) {
@@ -147,6 +164,44 @@ public class PossederView extends JFrame {
         add(scrollPane);
 
         setVisible(true);
+    }
+
+    // Méthodes pour récupérer les données
+    private List<String> getProprietaires() {
+        List<String> proprietaires = new ArrayList<>();
+        String query = "SELECT id_proprietaire, nom, prenom FROM Proprietaire";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(query);
+             ResultSet rs = ps.executeQuery()) {
+
+            while (rs.next()) {
+                int id = rs.getInt("id_proprietaire");
+                String nom = rs.getString("nom");
+                String prenom = rs.getString("prenom");
+                proprietaires.add(id + " - " + nom + " " + prenom); // Format : "id - Nom Prénom"
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return proprietaires;
+    }
+
+    private List<String> getModelesVehicules() {
+        List<String> modeles = new ArrayList<>();
+        String query = "SELECT id_modele, nom_modele FROM Modele";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(query);
+             ResultSet rs = ps.executeQuery()) {
+
+            while (rs.next()) {
+                int id = rs.getInt("id_modele");
+                String nomModele = rs.getString("nom_modele");
+                modeles.add(id + " - " + nomModele); // Format : "id - NomModele"
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return modeles;
     }
 
     // Rafraîchir la vue
