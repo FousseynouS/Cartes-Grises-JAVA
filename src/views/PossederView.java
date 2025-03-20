@@ -122,7 +122,7 @@ public class PossederView extends JFrame {
                     "Date de fin (YYYY-MM-DD, facultatif):", dateFinField
             };
 
-            int option = JOptionPane.showConfirmDialog(this, message, "Ajouter une relation", JOptionPane.OK_CANCEL_OPTION);
+            int option = JOptionPane.showConfirmDialog(this, message, "Ajouter", JOptionPane.OK_CANCEL_OPTION);
             if (option == JOptionPane.OK_OPTION) {
                 try {
                     // Extraire les ID des chaînes sélectionnées
